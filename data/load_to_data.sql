@@ -17,7 +17,7 @@ SHOW VARIABLES LIKE 'local_infile';
 Debe mostrar: ON */
 
 USE bronze;
-LOAD DATA LOCAL INFILE 'bronze/archivos.csv'
+LOAD DATA LOCAL INFILE '/archivos.csv'
 INTO TABLE previous_application
 FIELDS TERMINATED BY ','
 ENCLOSED BY '"'

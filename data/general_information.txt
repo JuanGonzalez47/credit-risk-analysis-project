@@ -1,5 +1,5 @@
 Para trabajar con los datos de la competencia Home Credit Default Risk, primero debes ingresar al enlace https://www.kaggle.com/competitions/home-credit-default-risk/data, 
 iniciar sesión en tu cuenta de Kaggle (y aceptar las reglas si es necesario), 
-luego descargar todos los archivos CSV disponibles y colocarlos sin cambiarles el nombre en la carpeta ./data/bronze/ del proyecto. Una vez hecho esto, debes ejecutar el script 
-/bronze/load_to_bronze.sql, el cual contiene instrucciones LOAD DATA LOCAL INFILE para importar cada archivo CSV a su tabla correspondiente dentro del esquema bronze de la base de datos, 
+luego descargar todos los archivos CSV disponibles y colocarlos sin cambiarles el nombre en la carpeta ./data/ del proyecto. Una vez hecho esto, debes ejecutar el script 
+data/load_to_data.sql, el cual contiene instrucciones LOAD DATA LOCAL INFILE para importar cada archivo CSV a su tabla correspondiente dentro del esquema bronze de la base de datos, 
 usando nombres de tabla en minúsculas. Es importante que tengas habilitada la opción LOCAL INFILE en tu cliente de base de datos (por ejemplo, MySQL Workbench o consola).
