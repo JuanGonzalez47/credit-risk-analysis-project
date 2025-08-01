@@ -3,10 +3,10 @@ CREATE DATABASE silver;
 CREATE DATABASE gold;
 
 USE bronze;
--- crear el esquema en silver una vez que se hayan cargado los datos en bronze
+-- crear el esquema en silver una vez que se hayan cargado los datos en bronze y crear las claves primarias y foraneas
 -- use silver; 
 CREATE TABLE application_train (
-    SK_ID_CURR INT PRIMARY KEY,
+    SK_ID_CURR INT,
     TARGET INT,
     NAME_CONTRACT_TYPE BIGINT,
     CODE_GENDER TEXT,
@@ -133,7 +133,7 @@ CREATE TABLE application_train (
 CREATE TABLE application_test LIKE application_train;
 
 CREATE TABLE bureau (
-    SK_ID_BUREAU INT PRIMARY KEY,
+    SK_ID_BUREAU INT,
     SK_ID_CURR INT,
     CREDIT_ACTIVE TEXT,
     CREDIT_CURRENCY TEXT,
@@ -149,20 +149,17 @@ CREATE TABLE bureau (
     AMT_CREDIT_SUM_OVERDUE DOUBLE,
     CREDIT_TYPE TEXT,
     DAYS_CREDIT_UPDATE INT,
-    AMT_ANNUITY TEXT,
-    FOREIGN KEY (SK_ID_CURR) REFERENCES application_train(SK_ID_CURR)
+    AMT_ANNUITY TEXT
 );
 
 CREATE TABLE bureau_balance (
     SK_ID_BUREAU INT,
     MONTHS_BALANCE INT,
-    STATUS TEXT,
-    PRIMARY KEY (SK_ID_BUREAU, MONTHS_BALANCE),
-    FOREIGN KEY (SK_ID_BUREAU) REFERENCES bureau(SK_ID_BUREAU)
+    STATUS TEXT
 );
 
 CREATE TABLE previous_application (
-    SK_ID_PREV INT PRIMARY KEY,
+    SK_ID_PREV INT,
     SK_ID_CURR INT,
     NAME_CONTRACT_TYPE TEXT,
     AMT_ANNUITY DOUBLE,
@@ -198,8 +195,7 @@ CREATE TABLE previous_application (
     DAYS_LAST_DUE_1ST_VERSION TEXT,
     DAYS_LAST_DUE TEXT,
     DAYS_TERMINATION TEXT,
-    NFLAG_INSURED_ON_APPROVAL TEXT,
-    FOREIGN KEY (SK_ID_CURR) REFERENCES application_train(SK_ID_CURR)
+    NFLAG_INSURED_ON_APPROVAL TEXT
 );
 
 CREATE TABLE POS_CASH_balance (
@@ -210,10 +206,7 @@ CREATE TABLE POS_CASH_balance (
     CNT_INSTALMENT_FUTURE DOUBLE,
     NAME_CONTRACT_STATUS TEXT,
     SK_DPD INT,
-    SK_DPD_DEF INT,
-    PRIMARY KEY (SK_ID_PREV, MONTHS_BALANCE),
-    FOREIGN KEY (SK_ID_PREV) REFERENCES previous_application(SK_ID_PREV),
-    FOREIGN KEY (SK_ID_CURR) REFERENCES application_train(SK_ID_CURR)
+    SK_DPD_DEF INT
 );
 
 CREATE TABLE credit_card_balance (
@@ -239,10 +232,7 @@ CREATE TABLE credit_card_balance (
     CNT_INSTALMENT_MATURE_CUM DOUBLE,
     NAME_CONTRACT_STATUS TEXT,
     SK_DPD INT,
-    SK_DPD_DEF INT,
-    PRIMARY KEY (SK_ID_PREV, MONTHS_BALANCE),
-    FOREIGN KEY (SK_ID_PREV) REFERENCES previous_application(SK_ID_PREV),
-    FOREIGN KEY (SK_ID_CURR) REFERENCES application_train(SK_ID_CURR)
+    SK_DPD_DEF INT
 );
 
 CREATE TABLE installments_payments (
@@ -253,11 +243,9 @@ CREATE TABLE installments_payments (
     DAYS_INSTALMENT DOUBLE,
     DAYS_ENTRY_PAYMENT DOUBLE,
     AMT_INSTALMENT DOUBLE,
-    AMT_PAYMENT DOUBLE,
-    PRIMARY KEY (SK_ID_PREV, NUM_INSTALMENT_NUMBER),
-    FOREIGN KEY (SK_ID_PREV) REFERENCES previous_application(SK_ID_PREV),
-    FOREIGN KEY (SK_ID_CURR) REFERENCES application_train(SK_ID_CURR)
+    AMT_PAYMENT DOUBLE
 );
+
 
 
 

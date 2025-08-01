@@ -7,7 +7,8 @@
 --POS_CASH_balance.csv  
 --previous_application.csv 
 
--- Abre una nueva consola en la ruta del proyecto:
+-- Abre una nueva consola en la ruta donde instalaron el mysql.exe (PATH)
+-- por lo general esta: "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
 
 --Copiar
 
