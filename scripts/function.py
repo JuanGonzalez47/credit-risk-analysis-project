@@ -200,17 +200,6 @@ def casos_cargos_adicionales(engine):
     return result
 
 
-def casos_cargos_adicionales(engine):
-    query = """
-    SELECT COUNT(*) as total_cargos_adicionales,
-           COUNT(*) * 100.0 / (SELECT COUNT(*) FROM credit_card_balance) as porcentaje
-    FROM credit_card_balance 
-    WHERE AMT_TOTAL_RECEIVABLE > AMT_RECIVABLE
-    """
-    result = pd.read_sql(query, engine)
-    print(f"Casos con cargos adicionales: {result['total_cargos_adicionales'].iloc[0]:,} ({result['porcentaje'].iloc[0]:.2f}%)")
-    return result
-
 def obtener_conteo_clientes_unicos(engine):
     """
     Ejecuta una consulta SQL sobre la tabla `credit_card_balance` para obtener:
@@ -471,3 +460,145 @@ def obtener_distribucion_incompletos(engine):
     except Exception as e:
         print(f"Error al obtener distribución de pagos incompletos: {e}")
         return None
+
+def _aggregate_installments_by_customer(df_inst):
+    """
+    Agrega los datos de pago de cuotas a nivel de cliente (SK_ID_CURR).
+
+    Esta función de ayuda procesa el DataFrame de 'installments_payments' para calcular
+    métricas clave del comportamiento de pago de cada cliente, como el retraso promedio,
+    la proporción de cuotas pagadas con retraso y la actividad general.
+
+    Parámetros:
+    ----------
+    df_inst : pd.DataFrame
+        DataFrame crudo que contiene los datos de la tabla 'installments_payments'.
+
+    Retorna:
+    --------
+    pd.DataFrame
+        Un DataFrame agregado con una fila por SK_ID_CURR y columnas que resumen
+        el comportamiento de pago de cuotas del cliente.
+    """
+    print("Step 1: Aggregating 'installments_payments' by customer...")
+    
+    inst = df_inst.copy()
+    inst['DAYS_LATE'] = inst['DAYS_ENTRY_PAYMENT'] - inst['DAYS_INSTALMENT']
+    inst['PAYMENT_RATIO'] = inst['AMT_PAYMENT'] / inst['AMT_INSTALMENT'].replace(0, np.nan)
+    
+    inst['IS_LATE'] = (inst['DAYS_LATE'] > 0).astype(int)
+    inst['IS_UNDERPAID'] = (inst['AMT_PAYMENT'] < inst['AMT_INSTALMENT']).astype(int)
+
+    agg = inst.groupby('SK_ID_CURR').agg(
+        # Métricas de tiempo de pago a nivel de cliente
+        AVG_DAYS_LATE=('DAYS_LATE', lambda x: x[x > 0].mean()),
+        MAX_DAYS_LATE=('DAYS_LATE', 'max'),
+        FRAC_LATE_INSTALLMENTS=('IS_LATE', 'mean'),
+        
+        # Métricas de monto de pago a nivel de cliente
+        AVG_PAYMENT_RATIO=('PAYMENT_RATIO', 'mean'),
+        FRAC_UNDERPAID_INSTALLMENTS=('IS_UNDERPAID', 'mean'),
+        
+        # Métricas de actividad a nivel de cliente
+        TOTAL_INSTALLMENTS_PAID=('SK_ID_PREV', 'count'),
+        TOTAL_LOANS_WITH_INSTALLMENTS=('SK_ID_PREV', 'nunique'),
+        DAYS_SINCE_LAST_PAYMENT=('DAYS_ENTRY_PAYMENT', 'max')
+    ).reset_index()
+
+    agg['DAYS_SINCE_LAST_PAYMENT'] = -agg['DAYS_SINCE_LAST_PAYMENT']
+    agg['AVG_DAYS_LATE'] = agg['AVG_DAYS_LATE'].fillna(0)
+
+    return agg
+
+def _aggregate_credit_card_by_customer(df_balance):
+    """
+    Agrega los datos del balance de tarjetas de crédito a nivel de cliente (SK_ID_CURR).
+
+    Esta función de ayuda procesa el DataFrame de 'credit_card_balance' para calcular
+    métricas sobre el uso de la tarjeta de crédito, como el saldo promedio, la utilización
+    del crédito y el historial de morosidad (DPD - Días de Atraso).
+
+    Parámetros:
+    ----------
+    df_balance : pd.DataFrame
+        DataFrame crudo que contiene los datos de la tabla 'credit_card_balance'.
+
+    Retorna:
+    --------
+    pd.DataFrame
+        Un DataFrame agregado con una fila por SK_ID_CURR y columnas que resumen
+        el comportamiento del cliente con tarjetas de crédito.
+    """
+    print("Step 2: Aggregating 'credit_card_balance' by customer...")
+    
+    ccb = df_balance.copy()
+    ccb['UTILIZATION_RATIO'] = ccb['AMT_BALANCE'] / ccb['AMT_CREDIT_LIMIT_ACTUAL'].replace(0, np.nan)
+    
+    agg = ccb.groupby('SK_ID_CURR').agg(
+        # Métricas de saldo y límite
+        AVG_BALANCE_TDC=('AMT_BALANCE', 'mean'),
+        MAX_BALANCE_TDC=('AMT_BALANCE', 'max'),
+        AVG_CREDIT_LIMIT_TDC=('AMT_CREDIT_LIMIT_ACTUAL', 'mean'),
+        AVG_UTILIZATION_RATIO_TDC=('UTILIZATION_RATIO', 'mean'),
+        
+        # Métricas de morosidad
+        AVG_DPD_TDC=('SK_DPD', 'mean'),
+        MAX_DPD_TDC=('SK_DPD', 'max'),
+        TOTAL_MONTHS_WITH_DPD_TDC=('SK_DPD', lambda x: (x > 0).sum())
+    ).reset_index()
+    
+    return agg
+
+
+def create_active_customer_gold_table(df_inst, df_balance):
+    """
+    Orquesta la creación de una tabla maestra 'Gold' a nivel de cliente (SK_ID_CURR),
+    incluyendo únicamente a los clientes con actividad en los DataFrames proporcionados.
+
+    Esta función consolida el comportamiento del cliente a partir de los datos de cuotas y
+    tarjetas de crédito. Utiliza una unión externa ('outer join') para fusionar los
+    resultados de las funciones de ayuda, creando un perfil completo para cada cliente
+    activo. El resultado es una tabla optimizada, lista para ser usada en dashboards
+    de alto rendimiento y modelos de machine learning.
+
+    Parámetros:
+    ----------
+    df_inst : pd.DataFrame
+        DataFrame crudo que contiene los datos de la tabla 'installments_payments'.
+        
+    df_balance : pd.DataFrame
+        DataFrame crudo que contiene los datos de la tabla 'credit_card_balance'.
+
+    Retorna:
+    --------
+    df_gold : pd.DataFrame
+        Un único DataFrame a nivel de SK_ID_CURR que contiene a todos los clientes
+        activos con sus características pre-calculadas y limpias.
+    """
+    print("--- Starting Gold Table Creation for Active Customers ---")
+    
+    # Procesar cada fuente de datos usando las funciones de ayuda
+    installments_agg = _aggregate_installments_by_customer(df_inst)
+    credit_card_agg = _aggregate_credit_card_by_customer(df_balance)
+    
+    # Fusionar los dos DataFrames agregados usando una unión externa.
+    # Esto asegura que cualquier cliente en al menos una de las tablas sea incluido.
+    print("Step 3: Merging data sources with an 'outer' join...")
+    df_gold = pd.merge(installments_agg, credit_card_agg, on='SK_ID_CURR', how='outer')
+    
+    # Limpieza final: la unión externa crea NaNs para clientes que están en una
+    # tabla pero no en la otra. Los rellenamos con valores por defecto con sentido de negocio.
+    df_gold.fillna({
+        # Columnas de cuotas
+        'AVG_DAYS_LATE': 0, 'MAX_DAYS_LATE': 0, 'FRAC_LATE_INSTALLMENTS': 0,
+        'AVG_PAYMENT_RATIO': 0, 'FRAC_UNDERPAID_INSTALLMENTS': 0,
+        'TOTAL_INSTALLMENTS_PAID': 0, 'TOTAL_LOANS_WITH_INSTALLMENTS': 0,
+        'DAYS_SINCE_LAST_PAYMENT': 9999,
+        # Columnas de tarjeta de crédito
+        'AVG_BALANCE_TDC': 0, 'MAX_BALANCE_TDC': 0, 'AVG_CREDIT_LIMIT_TDC': 0,
+        'AVG_UTILIZATION_RATIO_TDC': 0, 'AVG_DPD_TDC': 0, 'MAX_DPD_TDC': 0,
+        'TOTAL_MONTHS_WITH_DPD_TDC': 0
+    }, inplace=True)
+    
+    print("--- Gold Table Creation Complete ---")
+    return df_gold
