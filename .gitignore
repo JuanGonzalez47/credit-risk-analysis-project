@@ -2,7 +2,8 @@
 # datos
 venv
 *.db
-
+*.csv
 #python
 __pycache__
+
 
