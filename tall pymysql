@@ -1,0 +1,5 @@
+warning: in the working copy of 'notebooks/eda_notebook.ipynb', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'shema/shema_db.sql', LF will be replaced by CRLF the next time Git touches it
+data/load_to_data.sql
+notebooks/eda_notebook.ipynb
+shema/shema_db.sql
