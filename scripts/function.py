@@ -2,10 +2,6 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 
-
-import pandas as pd
-import numpy as np
-
 def prepare_features_for_modeling(df_balance, df_inst, 
                                   umbral_pago=0.0, umbral_cargo=0.0, umbral_balance=0.0):
     """
@@ -93,8 +89,6 @@ def prepare_features_for_modeling(df_balance, df_inst,
     print(df_gold[['NUM_LOANS_TOTAL', 'FRAC_PAYMENTS_LATE', 'AVG_PAYMENT_RATIO', 'RECENCY_DAYS']].describe())
 
     return df_gold
-
-
 
 
 def clientes_saldo_a_favor(engine):
