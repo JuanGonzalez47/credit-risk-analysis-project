@@ -603,3 +603,182 @@ def create_active_customer_gold_table(df_inst, df_balance):
     
     print("--- Gold Table Creation Complete ---")
     return df_gold
+
+
+def aggregate_previous_applications(df_previous):
+    """
+    Agrega los datos de solicitudes de crédito anteriores a nivel de cliente (SK_ID_CURR).
+
+    Esta función procesa el historial de un cliente con Home Credit para extraer
+    características clave como el número de préstamos anteriores, los montos
+    promedio solicitados y los tipos de productos más comunes.
+
+    Parámetros:
+    ----------
+    df_previous : pd.DataFrame
+        DataFrame a nivel de préstamo (`SK_ID_PREV`) con datos de 'previous_application'.
+        Debe contener: 'SK_ID_CURR', 'SK_ID_PREV', 'NAME_CONTRACT_TYPE', 
+        'AMT_APPLICATION', 'AMT_CREDIT', 'NAME_CLIENT_TYPE'.
+
+    Retorna:
+    --------
+    pd.DataFrame
+        Un DataFrame agregado con una fila por SK_ID_CURR.
+    """
+    print("Procesando 'previous_application' data...")
+    
+    # Agregaciones numéricas
+    agg_numeric = df_previous.groupby('SK_ID_CURR').agg(
+        PREV_LOAN_COUNT=('SK_ID_PREV', 'count'),
+        PREV_AVG_APPLICATION_AMT=('AMT_APPLICATION', 'mean'),
+        PREV_MAX_CREDIT_AMT=('AMT_CREDIT', 'max'),
+        PREV_TOTAL_CREDIT_SUM=('AMT_CREDIT', 'sum')
+    ).reset_index()
+
+    # Agregaciones categóricas (obteniendo la moda)
+    agg_categorical = df_previous.groupby('SK_ID_CURR').agg(
+        PREV_MOST_COMMON_CONTRACT_TYPE=('NAME_CONTRACT_TYPE', lambda x: x.mode().iloc[0]),
+        PREV_MOST_COMMON_CLIENT_TYPE=('NAME_CLIENT_TYPE', lambda x: x.mode().iloc[0])
+    ).reset_index()
+
+    # Unir agregaciones numéricas y categóricas
+    df_agg = pd.merge(agg_numeric, agg_categorical, on='SK_ID_CURR')
+    print("-> Agregación de 'previous_application' completada.")
+    return df_agg
+
+def aggregate_pos_cash(df_pos):
+    """
+    Agrega los datos de balances de préstamos POS y Cash a nivel de cliente (SK_ID_CURR).
+
+    Esta función procesa el historial mensual de los préstamos tipo POS/Cash para
+    extraer características como el total y el promedio de cuotas futuras
+    pendientes de pago.
+
+    Parámetros:
+    ----------
+    df_pos : pd.DataFrame
+        DataFrame a nivel de préstamo (`SK_ID_PREV`) con datos de 'POS_CASH_balance'.
+        Debe contener: 'SK_ID_CURR', 'SK_ID_PREV', 'CNT_INSTALMENT_FUTURE'.
+
+    Retorna:
+    --------
+    pd.DataFrame
+        Un DataFrame agregado con una fila por SK_ID_CURR.
+    """
+    print("Procesando 'POS_CASH_balance' data...")
+    
+    df_agg = df_pos.groupby('SK_ID_CURR').agg(
+        POS_TOTAL_FUTURE_INSTALLMENTS=('CNT_INSTALMENT_FUTURE', 'sum'),
+        POS_AVG_FUTURE_INSTALLMENTS=('CNT_INSTALMENT_FUTURE', 'mean')
+    ).reset_index()
+    
+    print("-> Agregación de 'POS_CASH_balance' completada.")
+    return df_agg
+
+def aggregate_bureau(df_bureau_for_model):
+    """
+    Agrega los datos del historial crediticio externo (bureau) a nivel de cliente (SK_ID_CURR).
+
+    Esta función procesa el historial de un cliente con otras instituciones financieras
+    para extraer características como el número de créditos externos, el estado de
+    dichos créditos (activos, cerrados) y los tipos de crédito que maneja.
+
+    Parámetros:
+    ----------
+    df_bureau : pd.DataFrame
+        DataFrame a nivel de préstamo (`SK_ID_PREV`) con datos de 'bureau'.
+        Debe contener: 'SK_ID_CURR', 'SK_ID_PREV', 'CREDIT_TYPE', 'CREDIT_ACTIVE'.
+
+    Retorna:
+    --------
+    pd.DataFrame
+        Un DataFrame agregado con una fila por SK_ID_CURR.
+    """
+    print("Procesando datos del 'bureau'...")
+    
+    # Contar créditos totales en el bureau
+    bureau_loan_counts = df_bureau_for_model.groupby('SK_ID_CURR', as_index=False)['SK_ID_PREV'].count().rename(columns={'SK_ID_PREV': 'BUREAU_LOAN_COUNT'})
+    
+    # Contar créditos por estado (Active, Closed, etc.)
+    credit_status_counts = pd.crosstab(df_bureau_for_model['SK_ID_CURR'], df_bureau_for_model['CREDIT_ACTIVE']).reset_index()
+    credit_status_counts.columns = ['SK_ID_CURR'] + [f'BUREAU_STATUS_{col.upper()}' for col in credit_status_counts.columns[1:]]
+
+    # Contar créditos por tipo (Credit card, Consumer credit, etc.)
+    credit_type_counts = pd.crosstab(df_bureau_for_model['SK_ID_CURR'], df_bureau_for_model['CREDIT_TYPE']).reset_index()
+    credit_type_counts.columns = ['SK_ID_CURR'] + [f'BUREAU_TYPE_{col.upper().replace(" ", "_")}' for col in credit_type_counts.columns[1:]]
+    
+    # Unir todas las agregaciones del bureau
+    df_agg = pd.merge(bureau_loan_counts, credit_status_counts, on='SK_ID_CURR', how='left')
+    df_agg = pd.merge(df_agg, credit_type_counts, on='SK_ID_CURR', how='left')
+    
+    # Asegurarse de rellenar NaNs si alguna categoría no existía para algún cliente
+    df_agg.fillna(0, inplace=True)
+    
+    print("-> Agregación de 'bureau' completada.")
+    return df_agg
+
+def create_final_ml_gold_table(df_installments, df_credit_card, df_previous, df_pos, df_bureau_for_model):
+    """
+    Orquesta la creación de la tabla Gold, consolidada y legible para el análisis.
+
+    Esta función integra el trabajo de cuatro fuentes de datos distintas, llamando a
+    funciones de agregación específicas para cada una y uniéndolas en un único
+
+    DataFrame a nivel de cliente. El resultado es una tabla rica en características,
+    limpia y fácil de interpretar, ideal para análisis exploratorio y como base
+    para futuros modelos.
+
+    NOTA: Esta función NO realiza transformaciones específicas para Machine Learning
+    como One-Hot Encoding o normalización.
+
+    Parámetros:
+    ----------
+    df_installments : pd.DataFrame
+        DataFrame crudo con los datos de 'installments_payments'.
+    df_credit_card : pd.DataFrame
+        DataFrame crudo con los datos de 'credit_card_balance'.
+    df_previous : pd.DataFrame
+        DataFrame crudo con los datos de 'previous_application'.
+    df_pos : pd.DataFrame
+        DataFrame crudo con los datos de 'POS_CASH_balance'.
+    df_bureau : pd.DataFrame
+        DataFrame crudo con los datos de 'bureau'.
+
+    Retorna:
+    --------
+    pd.DataFrame
+        La tabla Gold final, lista para análisis y como punto de partida para el modelado.
+    """
+    
+    # 1. Llamar a la función que ya tenías para crear la base
+    # (Asumiendo que tienes una función `prepare_features_for_modeling` disponible)
+    df_base_gold = prepare_features_for_modeling(df_credit_card, df_installments)
+    
+    # 2. Llamar a cada una de las nuevas funciones de agregación
+    df_previous_agg = aggregate_previous_applications(df_previous)
+    df_pos_agg = aggregate_pos_cash(df_pos)
+    df_bureau_agg = aggregate_bureau(df_bureau_for_model)
+    
+    # 3. Realizar el merge secuencial usando 'left' join
+    print("\nIniciando el merge final de todas las fuentes de datos...")
+    df_final_model = df_base_gold.copy()
+    df_final_model = pd.merge(df_final_model, df_previous_agg, on='SK_ID_CURR', how='left')
+    df_final_model = pd.merge(df_final_model, df_pos_agg, on='SK_ID_CURR', how='left')
+    df_final_model = pd.merge(df_final_model, df_bureau_agg, on='SK_ID_CURR', how='left')
+    print("-> Merge completado.")
+    
+    # 4. Limpieza final (Imputación de Nulos)
+    print("Realizando limpieza final...")
+    
+    # Rellenar todos los posibles NaNs con valores por defecto legibles
+    numeric_cols_to_fill = [col for col in df_final_model.columns if col.startswith(('PREV_', 'POS_', 'BUREAU_')) and df_final_model[col].dtype != 'object']
+    df_final_model[numeric_cols_to_fill] = df_final_model[numeric_cols_to_fill].fillna(0)
+    
+    categorical_cols_to_fill = [col for col in df_final_model.columns if col.startswith(('PREV_')) and df_final_model[col].dtype == 'object']
+    df_final_model[categorical_cols_to_fill] = df_final_model[categorical_cols_to_fill].fillna('No_History')
+    
+    print("-> Limpieza completada.")
+    print("\n¡Proceso finalizado! La tabla Gold legible está lista.")
+    
+    return df_final_model
+

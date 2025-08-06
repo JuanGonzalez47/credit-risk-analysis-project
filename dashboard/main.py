@@ -7,6 +7,12 @@ import applicants
 import credit
 import risk_level
 
+#Definir credenciales para levantar el streamlit de forma local, consumiendo la bae de datos gold de MySQL
+
+DB_USER = "root"
+DB_PASS = "juanMySQL0513." # Reemplaza con tu contraseña
+DB_HOST = "localhost"
+DB_PORT = "3306"
 
 # ──────────────────────────────────────────────
 # Configuración general
