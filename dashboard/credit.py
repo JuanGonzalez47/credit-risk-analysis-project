@@ -431,6 +431,74 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
             m3.metric("% Cuotas Atrasadas", f"{client_data['FRAC_LATE_INSTALLMENTS']:.1%}")
             m4.metric("Peor Atraso (Días)", f"{max(client_data['MAX_DAYS_LATE'], client_data['MAX_DPD_TDC']):.0f}")
     with tab5:
+        # Entrada manual del ID
+        id_input = st.number_input("Ingrese el ID del cliente (SK_ID_CURR)", 
+                                min_value=int(df['SK_ID_CURR'].min()), 
+                                max_value=int(df['SK_ID_CURR'].max()), step=1)
+
+        # Filtrar datos por cliente
+        df_filtrado = df[df['SK_ID_CURR'] == id_input]
+
+        # Mostrar tabla del cliente
+        if not df_filtrado.empty:
+            st.markdown(f"## Información para el cliente **{id_input}**")
+            st.dataframe(df_filtrado[['SK_ID_CURR', 'CREDIT_TYPE', 'CREDIT_ACTIVE']])
+
+            # Métricas
+            total_creditos = len(df_filtrado)
+            creditos_activos = df_filtrado[df_filtrado['CREDIT_ACTIVE'] == 'Active'].shape[0]
+            creditos_cerrados = df_filtrado[df_filtrado['CREDIT_ACTIVE'] == 'Closed'].shape[0]
+            tipos_credito_unicos = df_filtrado['CREDIT_TYPE'].nunique()
+
+            st.markdown("---")
+            st.subheader("📌 Métricas del Cliente")
+
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Créditos Totales", total_creditos)
+            m2.metric("Activos", creditos_activos)
+            m3.metric("Cerrados", creditos_cerrados)
+            m4.metric("Tipos de Crédito", tipos_credito_unicos)
+
+        else:
+            st.warning("⚠️ No se encontró información para el ID ingresado.")
+
+        # ==============================
+        # GRÁFICOS GLOBALES
+        # ==============================
+        st.markdown("---")
+        st.subheader("📊 Distribución General de Créditos")
+
+        # Estado de crédito global - gráfico de barras
+        estado_global = df['CREDIT_ACTIVE'].value_counts().reset_index()
+        estado_global.columns = ['Estado', 'Frecuencia']
+
+        fig_estado_global = px.bar(
+            estado_global,
+            x='Estado',
+            y='Frecuencia',
+            color='Estado',
+            title='Distribución General de Estado de Créditos',
+            text_auto=True
+        )
+
+        # Tipo de crédito global - torta top 4
+        tipo_global = df['CREDIT_TYPE'].value_counts().nlargest(4).reset_index()
+        tipo_global.columns = ['Tipo', 'Frecuencia']
+
+        fig_tipo_global = px.pie(
+            tipo_global,
+            names='Tipo',
+            values='Frecuencia',
+            title='Top 4 Tipos de Crédito (Global)',
+            hole=0  # pastel completo
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.plotly_chart(fig_estado_global, use_container_width=True)
+
+        with col2:
+            st.plotly_chart(fig_tipo_global, use_container_width=True)
         st.markdown("<h3 style='text-align: center; color: white;'>Tipo de Crédito y Estado</h3>", unsafe_allow_html=True)
         engine= "mysql+pymysql://root:jorgeantonio28$@localhost:3306/gold"
         df_bureau_final= pd.read_sql("select * from bureau", engine)
