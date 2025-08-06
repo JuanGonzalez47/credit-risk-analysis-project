@@ -146,9 +146,9 @@ if st.session_state.page == "Inicio":
 
     # ──────────────────────────────────────────────
 elif st.session_state.page == "Aplicantes":
-    applicants.app()  # Define `app()` en applicants.py
+    applicants.app(DB_USER=DB_USER, DB_PASS=DB_PASS, DB_HOST=DB_HOST, DB_PORT = DB_PORT)  # Define `app()` en applicants.py
 elif st.session_state.page == "Análisis Crediticio":
-    credit.app()
+    credit.app(DB_USER=DB_USER, DB_PASS=DB_PASS, DB_HOST=DB_HOST, DB_PORT = DB_PORT)
 elif st.session_state.page == "Modelos":
-    risk_level.app()
+    risk_level.app(DB_USER=DB_USER, DB_PASS=DB_PASS, DB_HOST=DB_HOST, DB_PORT = DB_PORT)
 

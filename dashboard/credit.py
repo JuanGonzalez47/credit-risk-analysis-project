@@ -18,14 +18,15 @@ def get_db_engine(DB_USER, DB_PASS, DB_HOST, DB_PORT):
         return None
 
 @st.cache_data
-def load_gold_data(_engine):
-    """Carga la tabla Gold pre-procesada desde la base de datos."""
+def load_gold_data(_engine, table_name="gold_active_customer_profile"):
+    """Carga una tabla específica desde la base de datos."""
     try:
-        df = pd.read_sql("SELECT * FROM gold_active_customer_profile", _engine)
+        df = pd.read_sql(f"SELECT * FROM {table_name}", _engine)
         return df
     except Exception as e:
-        st.error(f"No se pudo cargar la tabla 'gold_active_customer_profile'. Error: {e}")
+        st.error(f"No se pudo cargar la tabla '{table_name}'. Error: {e}")
         return pd.DataFrame()
+
 
 # Función para crear una tarjeta de KPI
 def crear_kpi_box(title, value, color):
@@ -69,7 +70,7 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
         st.error("La conexión a la base de datos ha fallado. La aplicación no puede continuar.")
         st.stop()
 
-    df = load_gold_data(engine)
+    df = load_gold_data(engine, "gold_active_customer_profile")
     if df.empty:
         st.warning("No se encontraron datos en la tabla 'gold_active_customer_profile'.")
         st.stop()
@@ -306,7 +307,7 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
         # Visualización 3: Buscador de Clientes
         st.markdown("<h3 style='text-align: center; color: white;'>Diagnóstico Individual de Cliente</h3>", unsafe_allow_html=True)
         list_of_clients = sorted(df_filtered['SK_ID_CURR'].unique())
-        selected_client_id = st.selectbox("Selecciona un ID de Cliente para analizar:", options=list_of_clients)
+        selected_client_id = st.selectbox("Selecciona un ID de Cliente para analizar:", options=list_of_clients, key='client_selector')
         if selected_client_id:
             client_data = df_filtered[df_filtered['SK_ID_CURR'] == selected_client_id].iloc[0]
             m1, m2, m3, m4 = st.columns(4)
@@ -419,25 +420,19 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
         **Análisis:** Este gráfico revela si el riesgo promedio varía según la cantidad de préstamos que un cliente ha tenido. Permite responder si la lealtad o la experiencia se correlacionan con un mejor o peor comportamiento de pago.
         """)
 
-        # Visualización 3: Buscador de Clientes
-        st.markdown("<h3 style='text-align: center; color: white;'>Diagnóstico Individual de Cliente</h3>", unsafe_allow_html=True)
-        list_of_clients = sorted(df_filtered['SK_ID_CURR'].unique())
-        selected_client_id = st.selectbox("Selecciona un ID de Cliente para analizar:", options=list_of_clients)
-        if selected_client_id:
-            client_data = df_filtered[df_filtered['SK_ID_CURR'] == selected_client_id].iloc[0]
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Puntuación de Riesgo", f"{client_data['RISK_SCORE']:.2f}")
-            m2.metric("% Utilización TDC", f"{client_data['AVG_UTILIZATION_RATIO_TDC']:.1%}")
-            m3.metric("% Cuotas Atrasadas", f"{client_data['FRAC_LATE_INSTALLMENTS']:.1%}")
-            m4.metric("Peor Atraso (Días)", f"{max(client_data['MAX_DAYS_LATE'], client_data['MAX_DPD_TDC']):.0f}")
     with tab5:
+        df_tab5 = load_gold_data(engine, "bureau")
+        if df_tab5.empty:
+            st.warning("No se encontraron datos en la tabla 'gold_active_customer_profile'.")
+            st.stop()
         # Entrada manual del ID
         id_input = st.number_input("Ingrese el ID del cliente (SK_ID_CURR)", 
-                                min_value=int(df['SK_ID_CURR'].min()), 
-                                max_value=int(df['SK_ID_CURR'].max()), step=1)
+                                min_value=int(df_tab5['SK_ID_CURR'].min()), 
+                                max_value=int(df_tab5['SK_ID_CURR'].max()), step=1)
 
         # Filtrar datos por cliente
-        df_filtrado = df[df['SK_ID_CURR'] == id_input]
+        df_filtrado = df_tab5[df_tab5['SK_ID_CURR'] == id_input]
+        st.dataframe(df_filtrado[['SK_ID_CURR', 'CREDIT_TYPE', 'CREDIT_ACTIVE']])
 
         # Mostrar tabla del cliente
         if not df_filtrado.empty:
@@ -469,7 +464,7 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
         st.subheader("📊 Distribución General de Créditos")
 
         # Estado de crédito global - gráfico de barras
-        estado_global = df['CREDIT_ACTIVE'].value_counts().reset_index()
+        estado_global = df_tab5['CREDIT_ACTIVE'].value_counts().reset_index()
         estado_global.columns = ['Estado', 'Frecuencia']
 
         fig_estado_global = px.bar(
@@ -482,7 +477,7 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
         )
 
         # Tipo de crédito global - torta top 4
-        tipo_global = df['CREDIT_TYPE'].value_counts().nlargest(4).reset_index()
+        tipo_global = df_tab5['CREDIT_TYPE'].value_counts().nlargest(4).reset_index()
         tipo_global.columns = ['Tipo', 'Frecuencia']
 
         fig_tipo_global = px.pie(
@@ -499,15 +494,11 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
 
         with col2:
             st.plotly_chart(fig_tipo_global, use_container_width=True)
-        st.markdown("<h3 style='text-align: center; color: white;'>Tipo de Crédito y Estado</h3>", unsafe_allow_html=True)
-        engine= "mysql+pymysql://root:jorgeantonio28$@localhost:3306/gold"
-        df_bureau_final= pd.read_sql("select * from bureau", engine)
-        
-        st.markdown("<h3 style='text-align: center; color: white;'>Análisis de Tipos y estado de Crédito</h3>", unsafe_allow_html=True)         
-          
+        df_tab5= pd.read_sql("select * from bureau", engine)
+                  
         # --- Tabla de Frecuencias (Activos y Cerrados) ---
-        creditos_activos = df_bureau_final[df_bureau_final['CREDIT_ACTIVE'] == 'Active']
-        creditos_cerrados = df_bureau_final[df_bureau_final['CREDIT_ACTIVE'] == 'Closed']
+        creditos_activos = df_tab5[df_tab5['CREDIT_ACTIVE'] == 'Active']
+        creditos_cerrados = df_tab5[df_tab5['CREDIT_ACTIVE'] == 'Closed']
 
         frecuencia_activos = creditos_activos['CREDIT_TYPE'].value_counts()
         frecuencia_cerrados = creditos_cerrados['CREDIT_TYPE'].value_counts()

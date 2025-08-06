@@ -7,10 +7,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.graph_objects as go
 
-DB_USER = "root"
-DB_PASS = "juanMySQL0513." # Reemplaza con tu contraseña
-DB_HOST = "localhost"
-DB_PORT = "3306"
 #Funciones de Carga de Datos con Caché
 
 @st.cache_resource
