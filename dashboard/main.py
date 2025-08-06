@@ -7,6 +7,12 @@ import applicants
 import credit
 import risk_level
 
+#Definir credenciales para levantar el streamlit de forma local, consumiendo la bae de datos gold de MySQL
+
+DB_USER = "root"
+DB_PASS = "juanMySQL0513." # Reemplaza con tu contraseña
+DB_HOST = "localhost"
+DB_PORT = "3306"
 
 # ──────────────────────────────────────────────
 # Configuración general
@@ -44,7 +50,7 @@ with st.sidebar:
             navegar("Modelos")
         if st.button("Análisis Crediticio"):
             navegar("Análisis Crediticio")
-        if st.button("Aplicantes"):
+        if st.button("Historial de Aplicantes"):
             navegar("Aplicantes")
         st.markdown("</div>", unsafe_allow_html=True)
 
