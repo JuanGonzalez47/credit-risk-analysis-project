@@ -7,14 +7,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.graph_objects as go
 
+DB_USER = "root"
+DB_PASS = "juanMySQL0513." # Reemplaza con tu contraseña
+DB_HOST = "localhost"
+DB_PORT = "3306"
 #Funciones de Carga de Datos con Caché
 
 @st.cache_resource
-def get_db_engine():
+def get_db_engine(DB_USER, DB_PASS, DB_HOST, DB_PORT):
     """Crea y cachea la conexión a la base de datos Gold."""
     try:
         # Asegúrate de que esta cadena de conexión sea correcta para tu sistema
-        engine = create_engine("mysql+pymysql://root:3136892780a@localhost/gold")
+        engine = create_engine(f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/gold")
         return engine
     except Exception as e:
         st.error(f"Error de conexión a la base de datos: {e}")
@@ -83,7 +87,7 @@ traducciones_dias = {
     "SUNDAY": "Domingo"
 }
 
-def app():
+def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
     
     #Este es el título principal de la sección de Aplicantes
     st.markdown("""
@@ -96,7 +100,7 @@ def app():
     """, unsafe_allow_html=True)
  
     #Cargamos datos de gold
-    engine = get_db_engine()
+    engine = get_db_engine(DB_USER, DB_PASS, DB_HOST, DB_PORT)
     df_previous = load_gold_data_previous(engine)
     df_pos = load_gold_data_POS(engine)
     
