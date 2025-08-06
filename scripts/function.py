@@ -241,6 +241,7 @@ def obtener_conteo_clientes_unicos(engine):
     except Exception as e:
         print(f"Error en la consulta: {e}")
         return None
+    
 def analizar_estado_contrato(engine):
     """
     Realiza un análisis por estado de contrato (`NAME_CONTRACT_STATUS`) en la tabla `credit_card_balance`.

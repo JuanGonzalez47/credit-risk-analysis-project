@@ -160,7 +160,7 @@ def app():
     st.markdown("<h2 style='color: #d8ddf9; font-family: Courier New; text-align: center;'>Análisis Detallado del Comportamiento</h2>", unsafe_allow_html=True)
 
     # Crear pestañas para organizar las visualizaciones
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Comportamiento en Cuotas", "💳 Comportamiento en Tarjetas de Crédito", "🎯 Segmentación y Riesgo", "🔬 Análisis Avanzado", 'Tipo de credito y estado'])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Comportamiento en Cuotas", "💳 Comportamiento en Tarjetas de Crédito", "🎯 Segmentación y Riesgo", "🔬 Análisis Avanzado", '📊 Tipo de credito y estado'])
 
     # --- Contenido de la Pestaña 1: Comportamiento en Cuotas ---
     with tab1:
@@ -429,5 +429,5 @@ def app():
             m3.metric("% Cuotas Atrasadas", f"{client_data['FRAC_LATE_INSTALLMENTS']:.1%}")
             m4.metric("Peor Atraso (Días)", f"{max(client_data['MAX_DAYS_LATE'], client_data['MAX_DPD_TDC']):.0f}")
     with tab5:
-         st.markdown("<h3 style='text-align: center; color: white;'>Análisis de Tipos y estado de Crédito</h3>", unsafe_allow_html=True)
-        """)            
+        st.markdown("<h3 style='text-align: center; color: white;'>Tipo de Crédito y Estado</h3>", unsafe_allow_html=True)
+                 
