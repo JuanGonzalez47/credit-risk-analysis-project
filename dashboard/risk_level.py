@@ -7,12 +7,12 @@ import plotly.express as px
 import pickle
 import os
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
-import re
+import sys
+
 
 @st.cache_resource
 def get_db_engine():
@@ -87,6 +87,16 @@ def load_map():
         model = pickle.load(f)
     return model
 
+def load_columns():
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    model_dir_path = os.path.join(BASE_DIR, "model")
+    target_filename = "risk_columns.pkl"
+    full_model_path = os.path.join(model_dir_path, target_filename)
+
+    with open(full_model_path, "rb") as f:
+        model = pickle.load(f)
+    return model
+
 @st.cache_resource
 def mostrar_matriz_confusion(y_test, y_pred):
     """
@@ -135,57 +145,68 @@ def mostrar_matriz_confusion(y_test, y_pred):
     )
 
     return fig
-def mostrar_importancia_features_agrupada(modelo, X, top_n=15):
-    """
-    Calcula la importancia de las características agrupando las variables dummy
-    y muestra el resultado en un gráfico de barras.
-    
-    Solo necesita el modelo y el DataFrame final (X) usado para entrenar.
-    """
-    st.header(f"Top {top_n} Características Más Importantes (Agrupadas)")
+def mostrar_importancia_features_agrupada(modelo, X, top_n):
 
-    # 1. Obtener importancias y nombres de columnas dummy
+    st.header(f"Top {top_n} Características Más Importantes")
+
     if not hasattr(modelo, 'feature_importances_'):
-        st.error("El modelo proporcionado no tiene el atributo 'feature_importances_'. Asegúrate de que es un modelo basado en árboles (Random Forest, Gradient Boosting, etc.).")
+        st.error("El modelo no tiene 'feature_importances_'. Asegúrate de que es un modelo basado en árboles.")
         return
 
     importancias = modelo.feature_importances_
-    columnas_dummy = X.columns
+    columnas_dummy = X.columns.tolist()
 
-    # 2. Agrupar importancias por característica original
-    # Esto extrae el nombre base. Ej: 'NAME_HOUSING_TYPE_4881' -> 'NAME_HOUSING_TYPE'
-    try:
-        nombres_originales = [re.split(r'_(?=[A-Za-z0-9_]*$)', col)[0] for col in columnas_dummy]
-    except Exception as e:
-        st.error(f"Hubo un error al intentar agrupar los nombres de las columnas. Error: {e}")
-        nombres_originales = columnas_dummy
+    # --- Lógica de Inferencia y Agrupación Automática ---
+    
+    # 1. Encontrar todos los posibles "prefijos" o "bases" de las columnas.
+    # Un prefijo es cualquier cosa antes de un guion bajo en una columna con varios.
+    posibles_bases = set()
+    for col in columnas_dummy:
+        parts = col.split('_')
+        if len(parts) > 1:
+            for i in range(1, len(parts)):
+                posibles_bases.add('_'.join(parts[:i]))
 
-    df_importancias = pd.DataFrame({
-        'feature_original': nombres_originales,
-        'importancia': importancias
-    })
+    # 2. Mapear cada columna dummy a su base más probable (la más larga posible).
+    mapa_columna_a_base = {}
+    # Ordenamos las bases de la más larga a la más corta para encontrar la coincidencia más específica primero.
+    bases_ordenadas = sorted(list(posibles_bases), key=len, reverse=True)
 
-    # Sumar las importancias de todas las dummies de una misma característica
-    importancias_agrupadas = df_importancias.groupby('feature_original')['importancia'].sum().sort_values(ascending=False)
+    for col in columnas_dummy:
+        base_encontrada = col  # Por defecto, la columna es su propia base (si es numérica).
+        for base in bases_ordenadas:
+            # Si la columna empieza con 'base_', encontramos su origen.
+            if col.startswith(base + '_'):
+                base_encontrada = base
+                break  # Encontramos la coincidencia más larga, pasamos a la siguiente columna.
+        mapa_columna_a_base[col] = base_encontrada
+    
+    # 3. Sumar las importancias usando el mapa que creamos.
+    importancias_agrupadas = {}
+    for col, imp in zip(columnas_dummy, importancias):
+        base = mapa_columna_a_base[col]
+        importancias_agrupadas[base] = importancias_agrupadas.get(base, 0) + imp
 
-    # 3. Seleccionar las N características originales más importantes
-    top_features = importancias_agrupadas.head(top_n)
+    # Convertimos a Serie de Pandas para ordenar y graficar.
+    top_features = pd.Series(importancias_agrupadas).sort_values(ascending=False).head(top_n)
 
-    # 4. Crear el gráfico de barras con Plotly Express (muy sencillo)
+    # --- Crear el Gráfico de Barras ---
     fig = px.bar(
         x=top_features.values,
         y=top_features.index,
-        orientation='h', # Gráfico horizontal
+        orientation='h',
         title=f'Importancia de las Top {top_n} Características',
-        labels={'x': 'Importancia Acumulada', 'y': 'Característica'},
-        template='plotly_dark' # Tema oscuro
+        labels={'x': 'Importancia Acumulada', 'y': 'Característica Inferida'},
+        template='plotly_dark'
     )
     
     fig.update_layout(
-        yaxis={'categoryorder':'total ascending'} # Ordenar de menor a mayor importancia
+        yaxis={'categoryorder': 'total ascending'}  # Ordena las barras de menor a mayor.
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+
 
 def app():
     engine = get_db_engine()
@@ -218,7 +239,7 @@ def app():
     
     # --- Pestañas para separar el formulario del análisis ---
     seccion = st.tabs(["Cuestionario", "Modelo riesgo","Modelo aprobacion de credito"])
-    
+    model=load_model()
     with seccion[0]:
         # --- Formulario de entrada de datos con estilo en línea ---
         st.markdown("""
@@ -276,26 +297,19 @@ def app():
         # --- Fila 6: Educación e Ingresos ---
         col9, col10 = st.columns(2)
         with col9:
-            name_education_type = st.selectbox('¿Cuál es su nivel de educación?', 
-                ('Secondary / secondary special', 'Higher education', 'Incomplete higher', 'Lower secondary', 'Academic degree'))
+            name_education_type = st.selectbox('¿Cuál es su nivel de educación?',df["NAME_EDUCATION_TYPE"].unique())
         with col10:
-            name_income_type = st.selectbox('¿Cuál es su tipo de ingreso?',options=
-                ('Working', 'Commercial associate', 'Pensioner', 'State servant', 'Student'))
+            name_income_type = st.selectbox('¿Cuál es su situación laboral?',options=df["NAME_INCOME_TYPE"].unique())
 
         # --- Fila 7: Estado Civil y Vivienda ---
         col11, col12 = st.columns(2)
         with col11:
-            name_family_status = st.selectbox('¿Cuál es su estado civil?', 
-                ('Married', 'Single / not married', 'Civil marriage', 'Separated', 'Widow'))
+            name_family_status = st.selectbox('¿Cuál es su estado civil?', df["NAME_FAMILY_STATUS"].unique())
         with col12:
-            name_housing_type = st.selectbox('¿Qué tipo de vivienda posee?', 
-                ('House / apartment', 'With parents', 'Municipal apartment', 'Rented apartment', 'Office apartment', 'Co-op apartment'))
+            name_housing_type = st.selectbox('¿Qué tipo de vivienda posee?', df["NAME_HOUSING_TYPE"].unique())
 
         # --- Fila 8: Ocupación ---
-        occupation_type = st.selectbox('¿Cuál es su ocupación?',
-            [np.nan, 'Laborers', 'Core staff', 'Sales staff', 'Managers', 'Drivers', 'High skill tech staff', 'Accountants', 'Medicine staff', 'Security staff', 'Cooking staff', 'Cleaning staff', 'Private service staff', 'Low-skill Laborers', 'Waiters/barmen staff', 'Secretaries', 'HR staff', 'Realty agents', 'IT staff'],
-            format_func=lambda x: 'No especificado' if pd.isna(x) else x
-        )
+        occupation_type = st.selectbox('¿Cuál es su ocupación?',df["OCCUPATION_TYPE"].unique())
         st.write("")
         
         # --- Botón de predicción ---
@@ -327,13 +341,18 @@ def app():
                 'OCCUPATION_TYPE': [occupation_type],
             })
 
-            if input_data['SK_ID_CURR']:
-                print("hola")
-            
-            st.write("---")
+            #if input_data['SK_ID_CURR']:
+                #print("hola")
+            orden=["FLAG_OWN_CAR","FLAG_OWN_REALTY","CNT_CHILDREN","AMT_INCOME_TOTAL",
+                   "AMT_CREDIT","NAME_INCOME_TYPE","NAME_EDUCATION_TYPE","NAME_FAMILY_STATUS",
+                   "NAME_HOUSING_TYPE","YEARS_BIRTH","DAYS_EMPLOYED","OWN_CAR_AGE","OCCUPATION_TYPE"]
+            input_data=input_data[orden]
+            df_dummies = pd.get_dummies(input_data, columns=input_data.select_dtypes("object").columns, dummy_na=False)
+            df_dummies = df_dummies.reindex(columns=load_columns(), fill_value=0)
+            mapping=load_map()
+            prediction=model.predict(df_dummies)
             st.subheader('Resultado de la Predicción')
-            st.info("La funcionalidad de predicción está en desarrollo...")
-            st.dataframe(input_data)
+            st.info(mapping[prediction[0]])
 
     with seccion[1]:
         st.markdown("""
@@ -391,23 +410,28 @@ def app():
             </h4>
             """, unsafe_allow_html=True)
         
-        model=load_model()
-        df_train=df.copy()
-        categoricas=df_train.select_dtypes("object").columns
-        for colum in categoricas:
-            freq_map = df_train[colum].value_counts().to_dict()
-            df_train[colum] = df_train[colum].map(freq_map)
-        df_train = pd.get_dummies(df_train, columns=categoricas)
-        df_train=df_train.astype(int)
-        X=df_train.drop("TARGET",axis=1)
-        y=df_train["TARGET"]
+        categoricas = df.select_dtypes("object").columns
+        df_processed = pd.get_dummies(df, columns=categoricas)
+
+        X=df_processed.drop("TARGET",axis=1)
+        y=df["TARGET"]
         scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
-        y_pred=model.predict(X_test)
-    
-        st.plotly_chart(mostrar_matriz_confusion(y_test,y_pred))
-        mostrar_importancia_features_agrupada(model,X,10)
+        X = scaler.fit_transform(X)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        y_pred = model.predict(X_test)
+
+        col13,col14=st.columns(2) 
+        with col13:
+            st.plotly_chart(mostrar_matriz_confusion(y_test,y_pred))
+            conclusion= """Conclusión Clave: El modelo es muy confiable. Su capacidad para identificar correctamente 
+            los casos de "Riesgo Alto" sin fallos lo hace especialmente valioso para prevenir situaciones críticas. 
+            Los escasos errores que comete son menores y solo ocurren entre las categorías de menor riesgo."""
+            st.info(conclusion)
+        with col14:
+            mostrar_importancia_features_agrupada(model,df.drop("TARGET",axis=1),5)
+            conclusion="""El modelo ha aprendido que la estabilidad residencial y la propiedad de un coche son los indicadores clave para predecir el resultado. 
+            Cualquier análisis o decisión de negocio basada en este modelo debería centrarse principalmente en estos dos aspectos."""
+            st.info(conclusion)
 
 
 
