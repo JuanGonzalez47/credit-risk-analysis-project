@@ -15,11 +15,11 @@ import sys
 
 
 @st.cache_resource
-def get_db_engine():
+def get_db_engine(DB_USER, DB_PASS, DB_HOST, DB_PORT):
     """Crea y cachea la conexión a la base de datos Gold."""
     try:
         # Asegúrate de que esta cadena de conexión sea correcta para tu sistema
-        engine = create_engine("mysql+pymysql://root:Enero182005%@127.0.0.1:3306/gold")
+        engine = create_engine(f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/gold")
         return engine
     except Exception as e:
         st.error(f"Error de conexión a la base de datos: {e}")
@@ -206,10 +206,8 @@ def mostrar_importancia_features_agrupada(modelo, X, top_n):
 
     st.plotly_chart(fig, use_container_width=True)
 
-
-
-def app():
-    engine = get_db_engine()
+def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
+    engine = get_db_engine(DB_USER, DB_PASS, DB_HOST, DB_PORT)
     if engine is None:
         st.error("La conexión a la base de datos ha fallado. La aplicación no puede continuar.")
         st.stop()
