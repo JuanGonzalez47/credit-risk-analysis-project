@@ -160,7 +160,7 @@ def app():
     st.markdown("<h2 style='color: #d8ddf9; font-family: Courier New; text-align: center;'>Análisis Detallado del Comportamiento</h2>", unsafe_allow_html=True)
 
     # Crear pestañas para organizar las visualizaciones
-    tab1, tab2, tab3, tab4 = st.tabs(["📈 Comportamiento en Cuotas", "💳 Comportamiento en Tarjetas de Crédito", "🎯 Segmentación y Riesgo", "🔬 Análisis Avanzado"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Comportamiento en Cuotas", "💳 Comportamiento en Tarjetas de Crédito", "🎯 Segmentación y Riesgo", "🔬 Análisis Avanzado", 'Tipo de credito y estado'])
 
     # --- Contenido de la Pestaña 1: Comportamiento en Cuotas ---
     with tab1:
@@ -301,6 +301,18 @@ def app():
         fig_scatter.update_traces(marker=dict(size=8, opacity=0.7))
         st.plotly_chart(fig_scatter, use_container_width=True)
 
+        # Visualización 3: Buscador de Clientes
+        st.markdown("<h3 style='text-align: center; color: white;'>Diagnóstico Individual de Cliente</h3>", unsafe_allow_html=True)
+        list_of_clients = sorted(df_filtered['SK_ID_CURR'].unique())
+        selected_client_id = st.selectbox("Selecciona un ID de Cliente para analizar:", options=list_of_clients)
+        if selected_client_id:
+            client_data = df_filtered[df_filtered['SK_ID_CURR'] == selected_client_id].iloc[0]
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Puntuación de Riesgo", f"{client_data['RISK_SCORE']:.2f}")
+            m2.metric("% Utilización TDC", f"{client_data['AVG_UTILIZATION_RATIO_TDC']:.1%}")
+            m3.metric("% Cuotas Atrasadas", f"{client_data['FRAC_LATE_INSTALLMENTS']:.1%}")
+            m4.metric("Peor Atraso (Días)", f"{max(client_data['MAX_DAYS_LATE'], client_data['MAX_DPD_TDC']):.0f}")
+
         st.info("""
         **Segmentos Estratégicos:**
         1.  `Arriba a la Izquierda (Bajo Riesgo, Alto Valor):` **Clientes Estrella.** (Fidelizar)
@@ -416,3 +428,6 @@ def app():
             m2.metric("% Utilización TDC", f"{client_data['AVG_UTILIZATION_RATIO_TDC']:.1%}")
             m3.metric("% Cuotas Atrasadas", f"{client_data['FRAC_LATE_INSTALLMENTS']:.1%}")
             m4.metric("Peor Atraso (Días)", f"{max(client_data['MAX_DAYS_LATE'], client_data['MAX_DPD_TDC']):.0f}")
+    with tab5:
+         st.markdown("<h3 style='text-align: center; color: white;'>Análisis de Tipos y estado de Crédito</h3>", unsafe_allow_html=True)
+        """)            
