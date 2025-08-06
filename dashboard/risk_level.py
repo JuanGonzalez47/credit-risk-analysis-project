@@ -356,7 +356,20 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
                 X_scaled_ID = scaler_id.fit_transform(X_ID_reindexed)
                 prediction1 = approval_model.predict(X_scaled_ID)
                 map = load_map("model_risk_4ID_OUTPUT.pickle")
-                st.success(f"**Clasificación de Riesgo:** {map[prediction1[0]]}")
+                # Clasificación textual
+                clasificacion = map[prediction1[0]]
+
+                # Mensajes personalizados
+                if clasificacion == "Riesgo Bajo":
+                    mensaje = "Su riesgo es bajo, el crédito está en proceso de verificación para ser aprobado. Por favor, espera una notificación oficial."
+                elif clasificacion == "Riesgo Medio":
+                    mensaje = "Su riesgo es medio, Por favor, acércate a una de nuestras sucursales o comunícate con nuestras líneas de atención para más información sobre tu solicitud."
+                elif clasificacion == "Riesgo Alto":
+                    mensaje = "Su riesgo es alto, Lamentamos informarte que tu solicitud de crédito ha sido rechazada."
+                else:
+                    mensaje = "Clasificación de riesgo no reconocida."
+
+                st.success(f"**Clasificación de Riesgo:** {clasificacion}\n\n{mensaje}")
             else:
                 orden=["FLAG_OWN_CAR","FLAG_OWN_REALTY","CNT_CHILDREN","AMT_INCOME_TOTAL",
                     "AMT_CREDIT","NAME_INCOME_TYPE","NAME_EDUCATION_TYPE","NAME_FAMILY_STATUS",
@@ -373,7 +386,18 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
                 mapping=load_map("risk_classifer_output.pickle")
                 prediction=model.predict(df_dummies)
                 st.subheader('Resultado de la Predicción')
-                st.success(f"**Clasificación de Riesgo:** {mapping[prediction[0]]}")
+                clasificacion_no_id = mapping[prediction[0]]
+                # Mensajes personalizados
+                if clasificacion_no_id == "Riesgo Bajo":
+                    mensaje_no_id = "Su riesgo es bajo, el crédito está en proceso de verificación para ser aprobado. Por favor, espera una notificación oficial."
+                elif clasificacion_no_id == "Riesgo Medio":
+                    mensaje_no_id = "Su riesgo es medio, Por favor, acércate a una de nuestras sucursales o comunícate con nuestras líneas de atención para más información sobre tu solicitud."
+                elif clasificacion_no_id == "Riesgo Alto":
+                    mensaje_no_id = "Su riesgo es alto, Lamentamos informarte que tu solicitud de crédito ha sido rechazada."
+                else:
+                    mensaje_no_id = "Clasificación de riesgo no reconocida."
+
+                st.success(f"**Clasificación de Riesgo:** {clasificacion_no_id}\n\n{mensaje_no_id}")
     
     with seccion[1]:
         st.markdown("""
