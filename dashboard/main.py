@@ -44,7 +44,7 @@ with st.sidebar:
             navegar("Modelos")
         if st.button("Análisis Crediticio"):
             navegar("Análisis Crediticio")
-        if st.button("Aplicantes"):
+        if st.button("Historial de Aplicantes"):
             navegar("Aplicantes")
         st.markdown("</div>", unsafe_allow_html=True)
 
