@@ -7,11 +7,11 @@ from sqlalchemy import create_engine
 #Funciones de Carga de Datos con Caché
 
 @st.cache_resource
-def get_db_engine():
+def get_db_engine(DB_USER, DB_PASS, DB_HOST, DB_PORT):
     """Crea y cachea la conexión a la base de datos Gold."""
     try:
         # Asegúrate de que esta cadena de conexión sea correcta para tu sistema
-        engine = create_engine("mysql+pymysql://root:juanMySQL0513.@localhost/gold")
+        engine = create_engine(f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/gold")
         return engine
     except Exception as e:
         st.error(f"Error de conexión a la base de datos: {e}")
@@ -56,13 +56,15 @@ def crear_kpi_box(title, value, color):
 
 #Función Principal de la Página
 
-def app():
+def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
     """
-    Esta función construye toda la página de 'Análisis Crediticio'.
+    Párametros: credenciales usadas para conectarse a la base de datos gold de forma local
+
+    Retorno: Esta función construye toda la página de 'Análisis Crediticio'.
     """
     st.markdown("<h1 style='color: #d8ddf9; font-family: Courier New; text-align: center;'>Análisis de Comportamiento Crediticio</h1>", unsafe_allow_html=True)
 
-    engine = get_db_engine()
+    engine = get_db_engine(DB_USER, DB_PASS, DB_HOST, DB_PORT)
     if engine is None:
         st.error("La conexión a la base de datos ha fallado. La aplicación no puede continuar.")
         st.stop()
@@ -430,20 +432,20 @@ def app():
             m4.metric("Peor Atraso (Días)", f"{max(client_data['MAX_DAYS_LATE'], client_data['MAX_DPD_TDC']):.0f}")
     with tab5:
         st.markdown("<h3 style='text-align: center; color: white;'>Tipo de Crédito y Estado</h3>", unsafe_allow_html=True)
-         engine= "mysql+pymysql://root:jorgeantonio28$@localhost:3306/gold"
-         df_bureau_final= pd.read_sql("select * from bureau", engine)
+        engine= "mysql+pymysql://root:jorgeantonio28$@localhost:3306/gold"
+        df_bureau_final= pd.read_sql("select * from bureau", engine)
         
-         st.markdown("<h3 style='text-align: center; color: white;'>Análisis de Tipos y estado de Crédito</h3>", unsafe_allow_html=True)         
+        st.markdown("<h3 style='text-align: center; color: white;'>Análisis de Tipos y estado de Crédito</h3>", unsafe_allow_html=True)         
           
-          # --- Tabla de Frecuencias (Activos y Cerrados) ---
-    creditos_activos = df_bureau_final[df_bureau_final['CREDIT_ACTIVE'] == 'Active']
-    creditos_cerrados = df_bureau_final[df_bureau_final['CREDIT_ACTIVE'] == 'Closed']
+        # --- Tabla de Frecuencias (Activos y Cerrados) ---
+        creditos_activos = df_bureau_final[df_bureau_final['CREDIT_ACTIVE'] == 'Active']
+        creditos_cerrados = df_bureau_final[df_bureau_final['CREDIT_ACTIVE'] == 'Closed']
 
-    frecuencia_activos = creditos_activos['CREDIT_TYPE'].value_counts()
-    frecuencia_cerrados = creditos_cerrados['CREDIT_TYPE'].value_counts()
+        frecuencia_activos = creditos_activos['CREDIT_TYPE'].value_counts()
+        frecuencia_cerrados = creditos_cerrados['CREDIT_TYPE'].value_counts()
 
-    frecuencia_comparada = pd.concat(
-        [frecuencia_activos, frecuencia_cerrados],
-        axis=1,
-        keys=['Activos', 'Cerrados']
-    ).fillna(0).astype(int)
+        frecuencia_comparada = pd.concat(
+            [frecuencia_activos, frecuencia_cerrados],
+            axis=1,
+            keys=['Activos', 'Cerrados']
+        ).fillna(0).astype(int)
