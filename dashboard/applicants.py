@@ -37,6 +37,39 @@ def load_gold_data_previous(_engine):
         st.error(f"No se pudo cargar la tabla 'previous_application_gold'. Error: {e}")
         return pd.DataFrame()
 
+# Traducir valores únicos de texto
+traducciones_tipo_contrato = {
+    "Cash loans": "Préstamo en efectivo",
+    "Consumer loans": "Préstamo de consumo",
+    "Revolving loans": "Crédito rotativo",
+    "XNA": "No especificado"
+}
+
+traducciones_estado_contrato = {
+    "Approved": "Aprobado",
+    "Refused": "Rechazado",
+    "Canceled": "Cancelado",
+    "Unused offer": "Oferta no utilizada"
+}
+
+traducciones_tipo_cliente = {
+    "Repeater": "Recurrente",
+    "New": "Nuevo",
+    "Refreshed": "Renovado",
+    "XNA": "No especificado"
+}
+
+traducciones_canal_venta = {
+    "Contact center": "Centro de contacto",
+    "Credit and cash offices": "Oficinas de crédito y efectivo",
+    "Country-wide": "A nivel nacional",
+    "Stone": "Sucursal física",
+    "Regional / Local": "Regional / Local",
+    "AP+ (Cash loan)": "AP+ (Préstamo en efectivo)",
+    "Channel of corporate sales": "Canal de ventas corporativas",
+    "Car dealer": "Concesionario"
+}
+
 def app():
     
     #Este es el título principal de la sección de Aplicantes
@@ -57,44 +90,12 @@ def app():
     #Aquí se define la estructura de pestañas para la sección de Aplicantes
     tab1, tab2, = st.tabs(["📊 Información por cliente", "📈 Análisis por métricas generales"])
     
-    # Traducir valores únicos de texto
-    traducciones_tipo_contrato = {
-        "Cash loans": "Préstamo en efectivo",
-        "Consumer loans": "Préstamo de consumo",
-        "Revolving loans": "Crédito rotativo",
-        "XNA": "No especificado"
-    }
-
-    traducciones_estado_contrato = {
-        "Approved": "Aprobado",
-        "Refused": "Rechazado",
-        "Canceled": "Cancelado",
-        "Unused offer": "Oferta no utilizada"
-    }
-    
-    traducciones_tipo_cliente = {
-        "Repeater": "Recurrente",
-        "New": "Nuevo",
-        "Refreshed": "Renovado",
-        "XNA": "No especificado"
-    }
-    
-    traducciones_canal_venta = {
-        "Contact center": "Centro de contacto",
-        "Credit and cash offices": "Oficinas de crédito y efectivo",
-        "Country-wide": "A nivel nacional",
-        "Stone": "Sucursal física",
-        "Regional / Local": "Regional / Local",
-        "AP+ (Cash loan)": "AP+ (Préstamo en efectivo)",
-        "Channel of corporate sales": "Canal de ventas corporativas",
-        "Car dealer": "Concesionario"
-    }
-    
     #Se empieza a trabajar con la primera pestaña
     with tab1:
+        
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         st.subheader("🔍 Buscar registros por ID de solicitud")
-
-
 
         #Seleccionamos el tipo de búsqueda
         if df_previous.empty: # or df_pos.empty:
@@ -102,6 +103,7 @@ def app():
         else:
              tipo_busqueda = st.selectbox("Selecciona tipo de búsqueda", ["Solicitud Actual", "Solicitud Previa"])
 
+        st.markdown("<br>", unsafe_allow_html=True)
         #Si hay datos, se pide el ID de la solicitud
         if tipo_busqueda == "Solicitud Actual":
             id_input = st.text_input("🆔 Ingresa el ID de la solicitud actual", key="curr_input")
@@ -111,6 +113,7 @@ def app():
             id_input = st.text_input("🆔 Ingresa el ID de la solicitud previa", key="prev_input")
             columna_id = "SK_ID_PREV"
         
+        st.markdown("<br><br>", unsafe_allow_html=True)
         if id_input:
             try:
                 id_input = int(id_input)
@@ -153,6 +156,7 @@ def app():
                             traducciones_tipo_contrato
                         )
                         
+                        st.markdown("<br><br>", unsafe_allow_html=True)
                         # ----------------------------
                         # Pie Chart - Tipo de contrato
                         # ----------------------------
@@ -204,7 +208,8 @@ def app():
                         with col2:
                             st.markdown("<h3 style='text-align: center;'>📊 Distribución del estado de contrato</h3>", unsafe_allow_html=True)
                             st.plotly_chart(fig_estado, use_container_width=True)
-                            
+                        
+                        st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
                         df_line = df_filtrado[[
                             "SK_ID_PREV",
                             "AMT_APPLICATION",
@@ -213,7 +218,7 @@ def app():
                         # Ordenar por ID de solicitud previa
                         df_line.sort_values("SK_ID_PREV", inplace=True)
 
-                        st.markdown("<h3 style='text-align: 'left';'>📈 Comparación entre Monto solicitado y Monto aprobado por solicitud previa</h3>",
+                        st.markdown("<h3 style='text-align: center;'>📈 Comparación entre Monto solicitado y Monto aprobado por solicitud previa</h3>",
                                     unsafe_allow_html=True)
                         # Convertir a formato largo para gráfico de líneas
                         df_melted = df_line.melt(
@@ -241,7 +246,7 @@ def app():
                         )
 
                         fig_line.update_layout(
-                            xaxis_title="SK_ID_PREV",
+                            xaxis_title="ID de solicitud previa",
                             yaxis_title="Monto ($)",
                             legend_title="Tipo de monto",
                             title_x=0.5,
@@ -257,6 +262,8 @@ def app():
 
                         st.plotly_chart(fig_line, use_container_width=True)
                         
+                        st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
+                        st.markdown("<h3 style='text-align: center;'>📊 Métricas generales de solicitudes previas</h3>", unsafe_allow_html=True)
                         #Establecimiento de métricas
                         promedio_solicitado = df_filtrado["AMT_APPLICATION"].mean()
                         promedio_aprobado = df_filtrado["AMT_CREDIT"].mean()
@@ -310,27 +317,64 @@ def app():
                     else:
                         st.markdown(f"### 📄 Detalle de solicitud previa \n `ID = {id_input}`")
 
-                        columnas = {
-                            "SK_ID_CURR": "ID de solicitud actual",
-                            "NAME_CONTRACT_TYPE": "Tipo de contrato",
-                            "NAME_CONTRACT_STATUS": "Estado de contrato",
-                            "AMT_APPLICATION": "Monto solicitado",
-                            "AMT_CREDIT": "Monto aprobado",
-                            "AMT_ANNUITY": "Monto anual a pagar",
-                            "NAME_CLIENT_TYPE": "Tipo de cliente",
-                            "CHANNEL_TYPE": "Canal de solicitud"
-                        }
-                        
-                        df_mostrar_prev = df_filtrado[list(columnas.keys())].rename(columns=columnas)
+                        # Extraer valores individuales
+                        tipo_contrato = df_filtrado["NAME_CONTRACT_TYPE"].iloc[0]
+                        estado_contrato = df_filtrado["NAME_CONTRACT_STATUS"].iloc[0]
+                        monto_solicitado = df_filtrado["AMT_APPLICATION"].iloc[0]
+                        monto_aprobado = df_filtrado["AMT_CREDIT"].iloc[0]
+                        monto_anual = df_filtrado["AMT_ANNUITY"].iloc[0]
+                        tipo_cliente = df_filtrado["NAME_CLIENT_TYPE"].iloc[0]
+                        canal = df_filtrado["CHANNEL_TYPE"].iloc[0]
 
-                        df_mostrar_prev["Tipo de contrato"] = df_mostrar_prev["Tipo de contrato"].replace(traducciones_tipo_contrato)
-                        df_mostrar_prev["Estado de contrato"] = df_mostrar_prev["Estado de contrato"].replace(traducciones_estado_contrato)
-                        df_mostrar_prev["Tipo de cliente"] = df_mostrar_prev["Tipo de cliente"].replace(traducciones_tipo_cliente)
-                        df_mostrar_prev["Canal de solicitud"] = df_mostrar_prev["Canal de solicitud"].replace(traducciones_canal_venta)
+                        # Aplicar traducción si aplica
+                        estado_contrato = traducciones_estado_contrato.get(estado_contrato, estado_contrato)
+                        tipo_contrato = traducciones_tipo_contrato.get(tipo_contrato, tipo_contrato)
+                        tipo_cliente = traducciones_tipo_cliente.get(tipo_cliente, tipo_cliente)
+                        canal = traducciones_canal_venta.get(canal, canal)
 
-                        # Establecer índice
-                        df_mostrar_prev.set_index("ID de solicitud actual", inplace=True)
+                        def crear_box(titulo, valor, icono="📌", color="#d0e7ff"):
+                            return f"""
+                            <div style="
+                                background-color: {color};
+                                padding: 15px;
+                                border-radius: 10px;
+                                margin-bottom: 10px;
+                                box-shadow: 0 0 5px rgba(0,0,0,0.1);
+                                text-align: center;
+                            ">
+                                <p style="margin: 0; color: #2c3e50; font-weight: bold;">{icono} {titulo}</p>
+                                <p style="margin: 5px 0 0 0; color: #2c3e50; font-size: 25px;">{valor}</p>
+                            </div>
+                            """
 
-                        st.dataframe(df_mostrar_prev)
+                        # Estado de contrato
+                        color_estado = "##28a745" if estado_contrato == "Aprobado" else "#dc3545"
+                        icono_estado = "🟢" if estado_contrato == "Aprobado" else "🔴"
+
+                        # ──────────────────────────────
+                        # Fila centrada: Estado del contrato
+                        st.markdown("### 📌 Información individual")
+                        col_estado = st.columns([1, 2, 1])[1]  # Columna central
+                        with col_estado:
+                            st.markdown(crear_box("Estado del contrato", f"{icono_estado} {estado_contrato}", icono="📊", color=color_estado), unsafe_allow_html=True)
+
+                        # ──────────────────────────────
+                        # Fila de 3 columnas
+                        col1, col2, col3 = st.columns(3)
+
+                        with col1:
+                            st.markdown(crear_box("Tipo de contrato", tipo_contrato, icono="📄"), unsafe_allow_html=True)
+                            st.markdown(crear_box("Monto solicitado", f"${monto_solicitado:,.0f}", icono="💰"), unsafe_allow_html=True)
+
+                        with col2:
+                            st.markdown(crear_box("Tipo de cliente", tipo_cliente, icono="👥"), unsafe_allow_html=True)
+                            st.markdown(crear_box("Monto aprobado", f"${monto_aprobado:,.0f}", icono="💵"), unsafe_allow_html=True)
+
+                        with col3:
+                            st.markdown(crear_box("Canal de solicitud", canal, icono="🏢"), unsafe_allow_html=True)
+                            st.markdown(crear_box("Monto anual a pagar", f"${monto_anual:,.0f}", icono="📅"), unsafe_allow_html=True)
             except ValueError:
                 st.error("⚠️ El ID ingresado debe ser un número entero.")
+    
+    with tab2:
+        pass
