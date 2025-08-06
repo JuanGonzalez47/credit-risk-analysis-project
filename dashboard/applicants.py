@@ -1,7 +1,8 @@
 # applicants.py
 import streamlit as st
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
+import plotly.express as px
 
 #Funciones de Carga de Datos con Caché
 
@@ -121,8 +122,71 @@ def app():
                         df_mostrar.set_index("ID de solicitud previa", inplace=True)
 
                         st.dataframe(df_mostrar)
+                        
+                        # Calcular porcentaje de cada estado de contrato
+                        conteo_estado = df_mostrar["Estado de contrato"].value_counts(normalize=True).reset_index()
+                        conteo_estado.columns = ["Estado de contrato", "Porcentaje"]
+                        conteo_estado["Porcentaje"] = conteo_estado["Porcentaje"] * 100  # convertir a %
+
+                        # Crear gráfico con plotly
+                        fig = px.bar(
+                            conteo_estado,
+                            x="Estado de contrato",
+                            y="Porcentaje",
+                            color="Estado de contrato",
+                            text=conteo_estado["Porcentaje"].apply(lambda x: f"{x:.1f}%"),
+                            title="Distribución porcentual del estado de contrato",
+                        )
+
+                        fig.update_layout(
+                            xaxis_title="Estado de contrato",
+                            yaxis_title="Porcentaje (%)",
+                            uniformtext_minsize=8,
+                            uniformtext_mode='hide'
+                        )
+
+                        st.plotly_chart(fig, use_container_width=True)
 
                 else:
-                    True
+                    df_filtrado = df_previous[df_previous["SK_ID_PREV"] == id_input]
+
+                    if df_filtrado.empty:
+                        st.info(f"No se encontraron resultados para ID = {id_input}")
+                    else:
+                        st.markdown(f"### 📄 Detalle de solicitud previa \n `ID = {id_input}`")
+
+                        # Seleccionar y renombrar columnas
+                        columnas_prev = {
+                            "SK_ID_CURR": "ID de solicitud actual",
+                            "NAME_CONTRACT_TYPE": "Tipo de contrato",
+                            "NAME_CONTRACT_STATUS": "Estado de contrato",
+                            "AMT_APPLICATION": "Monto aplicado",
+                            "AMT_CREDIT": "Monto aprobado"
+                        }
+
+                        df_mostrar_prev = df_filtrado[list(columnas_prev.keys())].rename(columns=columnas_prev)
+
+                        # Traducciones
+                        traducciones_tipo_contrato = {
+                            "Cash loans": "Préstamo en efectivo",
+                            "Consumer loans": "Préstamo de consumo",
+                            "Revolving loans": "Crédito rotativo",
+                            "XNA": "No especificado"
+                        }
+
+                        traducciones_estado_contrato = {
+                            "Approved": "Aprobado",
+                            "Refused": "Rechazado",
+                            "Canceled": "Cancelado",
+                            "Unused offer": "Oferta no utilizada"
+                        }
+
+                        df_mostrar_prev["Tipo de contrato"] = df_mostrar_prev["Tipo de contrato"].replace(traducciones_tipo_contrato)
+                        df_mostrar_prev["Estado de contrato"] = df_mostrar_prev["Estado de contrato"].replace(traducciones_estado_contrato)
+
+                        # Establecer índice
+                        df_mostrar_prev.set_index("ID de solicitud actual", inplace=True)
+
+                        st.dataframe(df_mostrar_prev)
             except ValueError:
                 st.error("⚠️ El ID ingresado debe ser un número entero.")
