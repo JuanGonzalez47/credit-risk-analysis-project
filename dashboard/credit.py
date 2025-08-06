@@ -430,4 +430,20 @@ def app():
             m4.metric("Peor Atraso (Días)", f"{max(client_data['MAX_DAYS_LATE'], client_data['MAX_DPD_TDC']):.0f}")
     with tab5:
         st.markdown("<h3 style='text-align: center; color: white;'>Tipo de Crédito y Estado</h3>", unsafe_allow_html=True)
-                 
+         engine= "mysql+pymysql://root:jorgeantonio28$@localhost:3306/gold"
+         df_bureau_final= pd.read_sql("select * from bureau", engine)
+        
+         st.markdown("<h3 style='text-align: center; color: white;'>Análisis de Tipos y estado de Crédito</h3>", unsafe_allow_html=True)         
+          
+          # --- Tabla de Frecuencias (Activos y Cerrados) ---
+    creditos_activos = df_bureau_final[df_bureau_final['CREDIT_ACTIVE'] == 'Active']
+    creditos_cerrados = df_bureau_final[df_bureau_final['CREDIT_ACTIVE'] == 'Closed']
+
+    frecuencia_activos = creditos_activos['CREDIT_TYPE'].value_counts()
+    frecuencia_cerrados = creditos_cerrados['CREDIT_TYPE'].value_counts()
+
+    frecuencia_comparada = pd.concat(
+        [frecuencia_activos, frecuencia_cerrados],
+        axis=1,
+        keys=['Activos', 'Cerrados']
+    ).fillna(0).astype(int)
