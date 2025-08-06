@@ -32,10 +32,10 @@ def calcular_distribuciones(df):
     return distribuciones
 
 @st.cache_data
-def load_gold_data(_engine):
+def load_gold_data(querry,_engine):
     """Carga la tabla Gold pre-procesada desde la base de datos."""
     try:
-        df = pd.read_sql("SELECT * FROM risk_level_data", _engine)
+        df = pd.read_sql(querry, _engine)
         return df
     except Exception as e:
         st.error(f"No se pudo cargar la tabla 'risk_level_data'. Error: {e}")
@@ -66,10 +66,10 @@ def contar_outliers(df, columnas_numericas):
     return outliers_por_columna
 
 @st.cache_resource
-def load_model():
+def load_model(model):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     model_dir_path = os.path.join(BASE_DIR, "model")
-    target_filename = "risk_classifer_model.pickle"
+    target_filename = model
     full_model_path = os.path.join(model_dir_path, target_filename)
 
     with open(full_model_path, "rb") as f:
@@ -77,20 +77,20 @@ def load_model():
     return model
 
 @st.cache_resource
-def load_map():
+def load_map(model):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     model_dir_path = os.path.join(BASE_DIR, "model")
-    target_filename = "risk_classifer_output.pickle"
+    target_filename = model
     full_model_path = os.path.join(model_dir_path, target_filename)
 
     with open(full_model_path, "rb") as f:
         model = pickle.load(f)
     return model
 
-def load_columns():
+def load_columns(model):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     model_dir_path = os.path.join(BASE_DIR, "model")
-    target_filename = "risk_columns.pkl"
+    target_filename = model
     full_model_path = os.path.join(model_dir_path, target_filename)
 
     with open(full_model_path, "rb") as f:
@@ -105,7 +105,7 @@ def mostrar_matriz_confusion(y_test, y_pred):
     valores dispares, mientras que las anotaciones muestran los conteos reales.
     """
     # Cargar el diccionario de clases desde Pickle
-    nombre_clases = load_map()
+    nombre_clases = load_map("risk_classifer_output.pickle")
 
     # Obtener etiquetas legibles y ordenadas
     etiquetas_unicas = sorted(np.unique(np.concatenate((y_test, y_pred))))
@@ -146,8 +146,6 @@ def mostrar_matriz_confusion(y_test, y_pred):
 
     return fig
 def mostrar_importancia_features_agrupada(modelo, X, top_n):
-
-    st.header(f"Top {top_n} Características Más Importantes")
 
     if not hasattr(modelo, 'feature_importances_'):
         st.error("El modelo no tiene 'feature_importances_'. Asegúrate de que es un modelo basado en árboles.")
@@ -212,7 +210,8 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
         st.error("La conexión a la base de datos ha fallado. La aplicación no puede continuar.")
         st.stop()
 
-    df = load_gold_data(engine)
+    df = load_gold_data("SELECT * FROM risk_level_data",engine)
+    df_id= load_gold_data("SELECT * FROM model_gold_id",engine)
     if df.empty:
         st.warning("No se encontraron datos en la tabla 'risk_level_data'.")
         st.stop()
@@ -236,8 +235,8 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
     st.write("---")
     
     # --- Pestañas para separar el formulario del análisis ---
-    seccion = st.tabs(["Cuestionario", "Modelo riesgo","Modelo aprobacion de credito"])
-    model=load_model()
+    seccion = st.tabs(["Cuestionario", "Modelo riesgo no clientes","Modelo riesgo clientes"])
+    model=load_model("risk_classifer_model.pickle")
     with seccion[0]:
         # --- Formulario de entrada de datos con estilo en línea ---
         st.markdown("""
@@ -338,24 +337,72 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
                 'OWN_CAR_AGE': [own_car_age if flag_own_car == 'Y' else np.nan],
                 'OCCUPATION_TYPE': [occupation_type],
             })
+            current_sk_id = input_data['SK_ID_CURR'].iloc[0]
+            if current_sk_id in df_id['SK_ID_CURR'].values:
+                st.subheader('Resultado para Cliente Existente')
+                st.info(f"El cliente con ID {current_sk_id} ya se encuentra en nuestros registros.")
+                approval_model = load_model("model_risk_4ID.pickle")
+                client_historical_data = df_id[df_id['SK_ID_CURR'] == current_sk_id].copy()
+                client_historical_data= client_historical_data.drop(columns=['SK_ID_CURR', 'TARGET'])
+                print(client_historical_data.head())
+                # 4. Realizar la predicción
+                categorical_features = client_historical_data.select_dtypes(include=['object']).columns
+                X_ID_encoded = pd.get_dummies(client_historical_data, columns=categorical_features)
+                columnas_model_id = load_columns("column_risk_4ID.pickle")
+                print("Columnas del modelo:", len(columnas_model_id))
+                X_ID_reindexed = X_ID_encoded.reindex(columns=columnas_model_id, fill_value=0)
+                X_ID_reindexed = X_ID_reindexed.astype(int)
+                scaler_id = StandardScaler()
+                X_scaled_ID = scaler_id.fit_transform(X_ID_reindexed)
+                prediction1 = approval_model.predict(X_scaled_ID)
+                map = load_map("model_risk_4ID_OUTPUT.pickle")
+                # Clasificación textual
+                clasificacion = map[prediction1[0]]
 
-            #if input_data['SK_ID_CURR']:
-                #print("hola")
-            orden=["FLAG_OWN_CAR","FLAG_OWN_REALTY","CNT_CHILDREN","AMT_INCOME_TOTAL",
-                   "AMT_CREDIT","NAME_INCOME_TYPE","NAME_EDUCATION_TYPE","NAME_FAMILY_STATUS",
-                   "NAME_HOUSING_TYPE","YEARS_BIRTH","DAYS_EMPLOYED","OWN_CAR_AGE","OCCUPATION_TYPE"]
-            input_data=input_data[orden]
-            df_dummies = pd.get_dummies(input_data, columns=input_data.select_dtypes("object").columns, dummy_na=False)
-            df_dummies = df_dummies.reindex(columns=load_columns(), fill_value=0)
-            mapping=load_map()
-            prediction=model.predict(df_dummies)
-            st.subheader('Resultado de la Predicción')
-            st.info(mapping[prediction[0]])
+                # Mensajes personalizados
+                if clasificacion == "Riesgo Bajo":
+                    mensaje = "Su riesgo es bajo, el crédito está en proceso de verificación para ser aprobado. Por favor, espera una notificación oficial."
+                elif clasificacion == "Riesgo Medio":
+                    mensaje = "Su riesgo es medio, Por favor, acércate a una de nuestras sucursales o comunícate con nuestras líneas de atención para más información sobre tu solicitud."
+                elif clasificacion == "Riesgo Alto":
+                    mensaje = "Su riesgo es alto, Lamentamos informarte que tu solicitud de crédito ha sido rechazada."
+                else:
+                    mensaje = "Clasificación de riesgo no reconocida."
 
+                st.success(f"**Clasificación de Riesgo:** {clasificacion}\n\n{mensaje}")
+            else:
+                orden=["FLAG_OWN_CAR","FLAG_OWN_REALTY","CNT_CHILDREN","AMT_INCOME_TOTAL",
+                    "AMT_CREDIT","NAME_INCOME_TYPE","NAME_EDUCATION_TYPE","NAME_FAMILY_STATUS",
+                    "NAME_HOUSING_TYPE","YEARS_BIRTH","DAYS_EMPLOYED","OWN_CAR_AGE","OCCUPATION_TYPE"]
+                
+                input_data=input_data[orden]
+                df_dummies=df.copy()
+                variable_colum=input_data.select_dtypes("object").columns
+                df_dummies = pd.get_dummies(input_data, columns=variable_colum)
+                columnas_model=load_columns("risk_columns.pkl")
+                df_dummies = df_dummies.reindex(columns=columnas_model, fill_value=0)
+
+        
+                mapping=load_map("risk_classifer_output.pickle")
+                prediction=model.predict(df_dummies)
+                st.subheader('Resultado de la Predicción')
+                clasificacion_no_id = mapping[prediction[0]]
+                # Mensajes personalizados
+                if clasificacion_no_id == "Riesgo Bajo":
+                    mensaje_no_id = "Su riesgo es bajo, el crédito está en proceso de verificación para ser aprobado. Por favor, espera una notificación oficial."
+                elif clasificacion_no_id == "Riesgo Medio":
+                    mensaje_no_id = "Su riesgo es medio, Por favor, acércate a una de nuestras sucursales o comunícate con nuestras líneas de atención para más información sobre tu solicitud."
+                elif clasificacion_no_id == "Riesgo Alto":
+                    mensaje_no_id = "Su riesgo es alto, Lamentamos informarte que tu solicitud de crédito ha sido rechazada."
+                else:
+                    mensaje_no_id = "Clasificación de riesgo no reconocida."
+
+                st.success(f"**Clasificación de Riesgo:** {clasificacion_no_id}\n\n{mensaje_no_id}")
+    
     with seccion[1]:
         st.markdown("""
             <h3 style='text-align: center; color: white; font-family: Courier New; font-style: italic;'>
-                Análisis y Métricas del Modelo
+                Análisis y Métricas del Modelo no clientes
             </h3>
             """, unsafe_allow_html=True)
         st.markdown("""
@@ -407,17 +454,18 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
                 Metricas del modelo
             </h4>
             """, unsafe_allow_html=True)
-        
-        categoricas = df.select_dtypes("object").columns
-        df_processed = pd.get_dummies(df, columns=categoricas)
-
-        X=df_processed.drop("TARGET",axis=1)
+        variables= df.select_dtypes("object").columns
+        df_dummies= pd.get_dummies(df, columns=variables)
+        X=df.drop("TARGET",axis=1)
+        columnas_model=load_columns("risk_columns.pkl")
+        df_dummies = df_dummies.reindex(columns=columnas_model, fill_value=0)
+        X=df_dummies
         y=df["TARGET"]
         scaler = StandardScaler()
         X = scaler.fit_transform(X)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
         y_pred = model.predict(X_test)
-
         col13,col14=st.columns(2) 
         with col13:
             st.plotly_chart(mostrar_matriz_confusion(y_test,y_pred))
@@ -430,7 +478,97 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
             conclusion="""El modelo ha aprendido que la estabilidad residencial y la propiedad de un coche son los indicadores clave para predecir el resultado. 
             Cualquier análisis o decisión de negocio basada en este modelo debería centrarse principalmente en estos dos aspectos."""
             st.info(conclusion)
+    
+    
+    with seccion[2]: # Tercera pestaña: "Modelo aprobacion de credito"
+        st.markdown("""
+            <h3 style='text-align: center; color: white; font-family: Courier New; font-style: italic;'>
+                Análisis y Métricas del Modelo de Aprobación de clientes
+            </h3>
+            """, unsafe_allow_html=True)
+        st.markdown("""
+            <h4 style='text-align: center; color: white; font-family: Courier New; font-style: italic;'>
+                Análisis de los Datos (Dataset de Clientes Existentes)
+            </h4>
+            """, unsafe_allow_html=True)
+        
+        # --- Análisis de Datos para df_id ---
+        col_id_1, col_id_2 = st.columns(2) 
+        with col_id_1:
+            # Usamos df_id para calcular y mostrar las distribuciones
+            distribuciones_id = calcular_distribuciones(df_id)
+            columna_id_cat = st.selectbox(
+                "Selecciona una columna categórica (Aprobación)", 
+                list(distribuciones_id.keys()), 
+                key='cat_id' # Usamos una 'key' única para este selectbox
+            )
+            
+            df_distribucion_id = distribuciones_id[columna_id_cat]
+            df_distribucion_id.columns = [columna_id_cat, 'Frecuencia']
 
+            fig_id_bar = px.bar(df_distribucion_id, x=columna_id_cat, y='Frecuencia', title=f'Distribución de {columna_id_cat}')
+            st.plotly_chart(fig_id_bar)
 
+        with col_id_2:
+            # Usamos df_id para los boxplots
+            columnas_numericas_id = obtener_columnas_numericas(df_id)
+            if "TARGET" in columnas_numericas_id:
+                columnas_numericas_id.remove("TARGET")
 
+            columna_id_num = st.selectbox(
+                "Selecciona una variable numérica (Aprobación)", 
+                columnas_numericas_id, 
+                key='num_id' # Usamos una 'key' única para este selectbox
+            )
+            
+            fig_id_box = px.box(df_id, y=columna_id_num, title=f'Boxplot de {columna_id_num}')
+            st.plotly_chart(fig_id_box)
 
+        # --- Métricas del Modelo para df_id ---
+        st.markdown("""
+            <h4 style='text-align: center; color: white; font-family: Courier New; font-style: italic;'>
+                Métricas del Modelo (Aprobación)
+            </h4>
+            """, unsafe_allow_html=True)
+
+        # --- Pipeline de preparación de datos IDÉNTICO al del entrenamiento ---
+        
+        # 1. Cargar el modelo correcto
+        approval_model = load_model("model_risk_4ID.pickle")
+        
+        # 2. Separar X e y desde el principio, usando df_id
+        X_id = df_id.drop("TARGET", axis=1)
+        y_id = df_id["TARGET"]
+        
+        # 3. Aplicar get_dummies
+        X_id_dummies = pd.get_dummies(X_id)
+        
+        # 4. Reindexar con las columnas del modelo de aprobación
+        approval_columns = load_columns("column_risk_4ID.pickle")
+        X_id_reindexed = X_id_dummies.reindex(columns=approval_columns, fill_value=0)
+        
+        # 5. Escalar los datos (usando el scaler del entrenamiento)
+        #    NOTA: Deberías guardar y cargar el scaler del entrenamiento.
+        #    Por ahora, replicamos la lógica de fit_transform para que funcione.
+        scaler_id = StandardScaler()
+        X_id_scaled = scaler_id.fit_transform(X_id_reindexed)
+        
+        # 6. Dividir los datos
+        X_train_id, X_test_id, y_train_id, y_test_id = train_test_split(X_id_scaled, y_id, test_size=0.2, random_state=42)
+        
+        # 7. Predecir con el modelo de aprobación
+        y_pred_id = approval_model.predict(X_test_id)
+        
+        # --- Visualización de Métricas ---
+        col13_id, col14_id = st.columns(2) 
+        with col13_id:
+            # NOTA: La función mostrar_matriz_confusion debe ser adaptada si los mapas de salida son diferentes.
+            # Por ahora, asumimos que usa el mapa correcto o que es genérica.
+            st.plotly_chart(mostrar_matriz_confusion(y_test_id, y_pred_id))
+            st.info("Conclusiones sobre la matriz de confusión del modelo de aprobación.")
+
+        with col14_id:
+            # ¡CORRECCIÓN IMPORTANTE! Pasamos el DataFrame con los dummies correctos (antes de escalar)
+            # para que la función pueda leer los nombres de las características.
+            mostrar_importancia_features_agrupada(approval_model, X_id_reindexed, 5)
+            st.info("Conclusiones sobre la importancia de características del modelo de aprobación.")
