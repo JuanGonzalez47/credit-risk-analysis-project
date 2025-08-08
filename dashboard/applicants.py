@@ -292,10 +292,10 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
                         # Determinar color de la proporción
                         color_proporcion = "#dc3545" if proporcion > 0.5 else "#28a745"
 
-                        # Crear columnas para métricas
+                        #Crear columnas para métricas
                         col1, col2, col3 = st.columns(3)
 
-                        # Estilo de caja métrica
+                        #Estilo de caja métrica
                         def caja_metrica(titulo, valor, color_fondo):
                             st.markdown(
                                 f"""
@@ -349,7 +349,7 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
                             return f"""
                             <div style="
                                 background-color: {color};
-                                padding: 15px;
+                                padding: 20px;
                                 border-radius: 10px;
                                 margin-bottom: 10px;
                                 box-shadow: 0 0 5px rgba(0,0,0,0.1);
