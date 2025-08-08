@@ -344,18 +344,18 @@ def app(DB_USER, DB_PASS, DB_HOST, DB_PORT):
                 approval_model = load_model("model_risk_4ID.pickle")
                 client_historical_data = df_id[df_id['SK_ID_CURR'] == current_sk_id].copy()
                 client_historical_data= client_historical_data.drop(columns=['SK_ID_CURR', 'TARGET'])
-                print(client_historical_data.head())
+
                 # 4. Realizar la predicción
                 categorical_features = client_historical_data.select_dtypes(include=['object']).columns
                 X_ID_encoded = pd.get_dummies(client_historical_data, columns=categorical_features)
                 columnas_model_id = load_columns("column_risk_4ID.pickle")
-                print("Columnas del modelo:", len(columnas_model_id))
                 X_ID_reindexed = X_ID_encoded.reindex(columns=columnas_model_id, fill_value=0)
                 X_ID_reindexed = X_ID_reindexed.astype(int)
                 scaler_id = StandardScaler()
                 X_scaled_ID = scaler_id.fit_transform(X_ID_reindexed)
                 prediction1 = approval_model.predict(X_scaled_ID)
                 map = load_map("model_risk_4ID_OUTPUT.pickle")
+                
                 # Clasificación textual
                 clasificacion = map[prediction1[0]]
 

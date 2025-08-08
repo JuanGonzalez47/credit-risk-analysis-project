@@ -10,7 +10,7 @@ import sys
 #Credenciales generales para consumir gold
 
 DB_USER = "root"
-DB_PASS = "juanMySQL0513." # Reemplaza con tu contraseña
+DB_PASS = "Tu_contraseña." # Reemplaza con tu contraseña
 DB_HOST = "localhost"
 DB_PORT = "3306"
 
@@ -23,7 +23,7 @@ except Exception as e:
 
 # --------------------------------------------------------
 
-#Modelo para clientes no regustrados
+#Modelo para clientes no registrados
 
 df=pd.read_sql_query("SELECT*FROM risk_level_data",engine_gold)
 categoricas = df.select_dtypes("object").columns
