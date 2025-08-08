@@ -10,7 +10,7 @@ import sys
 #Credenciales generales para consumir gold
 
 DB_USER = "root"
-DB_PASS = "juanMySQL0513." # Reemplaza con tu contraseña
+DB_PASS = "Tu_contraseña." # Reemplaza con tu contraseña
 DB_HOST = "localhost"
 DB_PORT = "3306"
 
@@ -38,7 +38,6 @@ X_ID_encoded = X_ID_encoded.astype(int)
 model_columns_id = X_ID_encoded.columns.tolist()
 scaler_id = StandardScaler()
 X_scaled = scaler_id.fit_transform(X_ID_encoded)
-print(X_scaled.shape)
 X_train_ID, X_test_ID, y_train_ID, y_test_ID = train_test_split(X_scaled, y_ID, test_size=0.2, random_state=42)
 model_ID = RandomForestClassifier(n_estimators=100, random_state=42,class_weight='balanced')
 model_ID.fit(X_train_ID, y_train_ID)
