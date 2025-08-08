@@ -76,3 +76,7 @@ If you want see Trello ----> https://trello.com/invite/b/688b808e4beda113d9301e9
 - Machine Learning: Scikit-learn
 - Data Visualization: Matplotlib, Seaborn, (Library used for dashboard, Streamlit and Plotly Dash)
 - Project Management: Trello, Git & GitHub
+
+# 10. License
+
+This project is licensed under the MIT License. See the LICENSE file for more details.
